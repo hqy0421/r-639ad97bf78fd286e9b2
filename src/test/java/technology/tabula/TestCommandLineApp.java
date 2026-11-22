@@ -216,4 +216,46 @@ public class TestCommandLineApp {
         assertEquals(expectedJson, resultJson);
     }
 
+    @Test
+    public void testStreamSideBySideSplitOption() throws ParseException, IOException {
+
+        String expectedCsv = UtilsForTesting.loadCsv("src/test/resources/technology/tabula/csv/MultiColumn.csv");
+
+        // the split output, two tables written back to back, matches the
+        // existing area-based extraction apart from line endings
+        String result = this.csvFromCommandLineArgs(new String[]{
+                "src/test/resources/technology/tabula/MultiColumn.pdf",
+                "-p", "1",
+                "-t",
+                "--split-side-by-side",
+                "-f", "CSV"
+        });
+        String normalize = expectedCsv.replaceAll("\\r\\n?", "\n").replaceAll("\\n$", "");
+        assertEquals(normalize, result.replaceAll("\\r\\n?", "\n").replaceAll("\\n$", ""));
+    }
+
+    @Test
+    public void testStreamSideBySideSplitKeepsWideTableByDefault() throws ParseException {
+
+        String result = this.csvFromCommandLineArgs(new String[]{
+                "src/test/resources/technology/tabula/MultiColumn.pdf",
+                "-p", "1",
+                "-t",
+                "-f", "CSV"
+        });
+        // without the flag the two tables are read as one 6-column wide table
+        assertEquals("1,100,200,25,124,224", result.split("\\r?\\n")[0]);
+    }
+
+    @Test(expected = ParseException.class)
+    public void testSplitMinGapWidthRejectsNonNumericValue() throws ParseException {
+        this.csvFromCommandLineArgs(new String[]{
+                "src/test/resources/technology/tabula/MultiColumn.pdf",
+                "-p", "1",
+                "--split-side-by-side",
+                "--split-min-gap-width", "wide",
+                "-f", "CSV"
+        });
+    }
+
 }

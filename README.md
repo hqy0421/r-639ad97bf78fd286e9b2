@@ -17,7 +17,9 @@ Download a version of the tabula-java's jar, with all dependencies included, tha
 $ java -jar target/tabula-1.0.5-jar-with-dependencies.jar --help
 usage: tabula [-a <AREA>] [-b <DIRECTORY>] [-c <COLUMNS>] [-f <FORMAT>]
        [-g] [-h] [-i] [-l] [-n] [-o <OUTFILE>] [-p <PAGES>] [-r] [-s
-       <PASSWORD>] [-t] [-u] [-v]
+       <PASSWORD>] [--split-min-blocks-per-row <BLOCKS>]
+       [--split-min-gap-width <WIDTH>] [--split-min-valid-rows <ROWS>]
+       [--split-side-by-side] [-t] [-u] [-v]
 
 Tabula helps you extract tables from PDFs
 
@@ -61,6 +63,23 @@ Tabula helps you extract tables from PDFs
                             separating each cell, as in a PDF of an Excel
                             spreadsheet)
  -s,--password <PASSWORD>   Password to decrypt document. Default is empty
+    --split-min-blocks-per-row <BLOCKS>
+                            Stream mode only: minimum number of non-empty
+                            text blocks a row must contain on one side to
+                            count as a valid row for --split-side-by-side.
+                            Default: 2
+    --split-min-gap-width <WIDTH>
+                            Stream mode only: minimum width, in points, of
+                            the empty vertical band required for a
+                            --split-side-by-side cut. Default: 20
+    --split-min-valid-rows <ROWS>
+                            Stream mode only: minimum number of valid rows
+                            required on each side of a
+                            --split-side-by-side cut. Default: 3
+    --split-side-by-side   Stream mode only: split candidate areas that
+                            contain two or more borderless tables printed
+                            side by side at the same height, separated by a
+                            vertical band with no text crossing it.
  -t,--stream                Force PDF to be extracted using stream-mode
                             extraction (if there are no ruling lines
                             separating each cell)

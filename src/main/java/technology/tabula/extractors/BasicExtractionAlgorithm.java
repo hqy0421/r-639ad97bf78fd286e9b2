@@ -15,14 +15,44 @@ import technology.tabula.TextChunk;
 import technology.tabula.TextElement;
 
 public class BasicExtractionAlgorithm implements ExtractionAlgorithm {
-    
+
     private List<Ruling> verticalRulings = null;
-    
+
+    private boolean splitSideBySideTables = false;
+    private float splitMinGapWidth = SideBySideTableSplitter.DEFAULT_MIN_GAP_WIDTH;
+    private int splitMinValidRows = SideBySideTableSplitter.DEFAULT_MIN_VALID_ROWS;
+    private int splitMinBlocksPerRow = SideBySideTableSplitter.DEFAULT_MIN_BLOCKS_PER_ROW;
+
     public BasicExtractionAlgorithm() {
     }
-    
+
     public BasicExtractionAlgorithm(List<Ruling> verticalRulings) {
         this.verticalRulings = verticalRulings;
+    }
+
+    /**
+     * Enables splitting candidate areas that contain several borderless tables
+     * printed side by side. When disabled (the default), extraction behavior is
+     * unchanged.
+     */
+    public void setSplitSideBySideTables(boolean splitSideBySideTables) {
+        this.splitSideBySideTables = splitSideBySideTables;
+    }
+
+    public boolean isSplitSideBySideTables() {
+        return splitSideBySideTables;
+    }
+
+    public void setSplitMinGapWidth(float splitMinGapWidth) {
+        this.splitMinGapWidth = splitMinGapWidth;
+    }
+
+    public void setSplitMinValidRows(int splitMinValidRows) {
+        this.splitMinValidRows = splitMinValidRows;
+    }
+
+    public void setSplitMinBlocksPerRow(int splitMinBlocksPerRow) {
+        this.splitMinBlocksPerRow = splitMinBlocksPerRow;
     }
     
     public List<Table> extract(Page page, List<Float> verticalRulingPositions) {
@@ -36,17 +66,41 @@ public class BasicExtractionAlgorithm implements ExtractionAlgorithm {
 
     @Override
     public List<Table> extract(Page page) {
-        
+
         List<TextElement> textElements = page.getText();
-        
+
         if (textElements.size() == 0) {
             return Arrays.asList(new Table[] { Table.empty() });
         }
-        
+
+        // Optional: split side-by-side borderless tables before extraction. Only
+        // the automatic column detection path is affected; explicit vertical
+        // rulings or a disabled flag keep the original single-table behavior.
+        if (this.splitSideBySideTables && this.verticalRulings == null) {
+            SideBySideTableSplitter splitter = new SideBySideTableSplitter(
+                    this.splitMinGapWidth, this.splitMinValidRows, this.splitMinBlocksPerRow);
+            List<Page> subPages = splitter.split(page);
+
+            if (subPages.size() > 1) {
+                List<Table> tables = new ArrayList<>(subPages.size());
+                for (Page subPage : subPages) {
+                    // Sub-areas are already split; extract each with the
+                    // original logic, ordered left to right.
+                    tables.add(extractSingleTable(subPage));
+                }
+                return tables;
+            }
+        }
+
+        return Arrays.asList(new Table[] { extractSingleTable(page) });
+    }
+
+    private Table extractSingleTable(Page page) {
+
         List<TextChunk> textChunks = this.verticalRulings == null ? TextElement.mergeWords(page.getText()) : TextElement.mergeWords(page.getText(), this.verticalRulings);
         List<Line> lines = TextChunk.groupByLines(textChunks);
         List<Float> columns = null;
-        
+
         if (this.verticalRulings != null) {
             Collections.sort(this.verticalRulings, new Comparator<Ruling>() {
                 @Override
@@ -62,7 +116,7 @@ public class BasicExtractionAlgorithm implements ExtractionAlgorithm {
         else {
             columns = columnPositions(lines);
         }
-        
+
         Table table = new Table(this);
         table.setRect(page.getLeft(), page.getTop(), page.getWidth(), page.getHeight());
         table.setPageNumber(page.getPageNumber());
@@ -70,7 +124,7 @@ public class BasicExtractionAlgorithm implements ExtractionAlgorithm {
         for (int i = 0; i < lines.size(); i++) {
             Line line = lines.get(i);
             List<TextChunk> elements = line.getTextElements();
-            
+
             Collections.sort(elements, new Comparator<TextChunk>() {
 
 				@Override
@@ -78,7 +132,7 @@ public class BasicExtractionAlgorithm implements ExtractionAlgorithm {
 					return Float.compare(o1.getLeft(), o2.getLeft());
 				}
 			});
-            
+
             for (TextChunk tc: elements) {
                 if (tc.isSameChar(Line.WHITE_SPACE_CHARS)) {
                     continue;
@@ -88,15 +142,15 @@ public class BasicExtractionAlgorithm implements ExtractionAlgorithm {
                 boolean found = false;
                 for(; j < columns.size(); j++) {
                     if (tc.getLeft() <= columns.get(j)) {
-                        found = true; 
+                        found = true;
                         break;
-                    } 
+                    }
                 }
                 table.add(tc, i, found ? j : columns.size());
             }
         }
-        
-        return Arrays.asList(new Table[] { table } );
+
+        return table;
     }
     
     @Override

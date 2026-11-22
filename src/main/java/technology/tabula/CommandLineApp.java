@@ -271,6 +271,31 @@ public class CommandLineApp {
         extractor.setGuess(line.hasOption('g'));
         extractor.setMethod(CommandLineApp.whichExtractionMethod(line));
         extractor.setUseLineReturns(line.hasOption('u'));
+        extractor.setSplitSideBySideTables(line.hasOption("split-side-by-side"));
+
+        if (line.hasOption("split-min-gap-width")) {
+            try {
+                extractor.setSplitMinGapWidth(Float.parseFloat(line.getOptionValue("split-min-gap-width")));
+            } catch (NumberFormatException e) {
+                throw new ParseException("Wrong number syntax for --split-min-gap-width");
+            }
+        }
+
+        if (line.hasOption("split-min-valid-rows")) {
+            try {
+                extractor.setSplitMinValidRows(Integer.parseInt(line.getOptionValue("split-min-valid-rows")));
+            } catch (NumberFormatException e) {
+                throw new ParseException("Wrong number syntax for --split-min-valid-rows");
+            }
+        }
+
+        if (line.hasOption("split-min-blocks-per-row")) {
+            try {
+                extractor.setSplitMinBlocksPerRow(Integer.parseInt(line.getOptionValue("split-min-blocks-per-row")));
+            } catch (NumberFormatException e) {
+                throw new ParseException("Wrong number syntax for --split-min-blocks-per-row");
+            }
+        }
 
         if (line.hasOption('c')) {
             String optionString = line.getOptionValue('c');
@@ -364,6 +389,28 @@ public class CommandLineApp {
                 .hasArg()
                 .argName("PAGES")
                 .build());
+        o.addOption(Option.builder()
+                .longOpt("split-side-by-side")
+                .desc("Stream mode only: split candidate areas that contain two or more borderless tables printed side by side at the same height, separated by a vertical band with no text crossing it.")
+                .build());
+        o.addOption(Option.builder()
+                .longOpt("split-min-gap-width")
+                .desc("Minimum width, in points, of the empty vertical band required for a --split-side-by-side cut. Default: 20")
+                .hasArg()
+                .argName("WIDTH")
+                .build());
+        o.addOption(Option.builder()
+                .longOpt("split-min-valid-rows")
+                .desc("Minimum number of valid rows required on each side of a --split-side-by-side cut. Default: 3")
+                .hasArg()
+                .argName("ROWS")
+                .build());
+        o.addOption(Option.builder()
+                .longOpt("split-min-blocks-per-row")
+                .desc("Minimum number of non-empty text blocks a row must contain on one side to count as a valid row for --split-side-by-side. Default: 2")
+                .hasArg()
+                .argName("BLOCKS")
+                .build());
 
         return o;
     }
@@ -371,6 +418,10 @@ public class CommandLineApp {
     private static class TableExtractor {
         private boolean guess = false;
         private boolean useLineReturns = false;
+        private boolean splitSideBySideTables = false;
+        private float splitMinGapWidth = technology.tabula.extractors.SideBySideTableSplitter.DEFAULT_MIN_GAP_WIDTH;
+        private int splitMinValidRows = technology.tabula.extractors.SideBySideTableSplitter.DEFAULT_MIN_VALID_ROWS;
+        private int splitMinBlocksPerRow = technology.tabula.extractors.SideBySideTableSplitter.DEFAULT_MIN_BLOCKS_PER_ROW;
         private BasicExtractionAlgorithm basicExtractor = new BasicExtractionAlgorithm();
         private SpreadsheetExtractionAlgorithm spreadsheetExtractor = new SpreadsheetExtractionAlgorithm();
 
@@ -398,6 +449,29 @@ public class CommandLineApp {
             this.useLineReturns = useLineReturns;
         }
 
+        public void setSplitSideBySideTables(boolean splitSideBySideTables) {
+            this.splitSideBySideTables = splitSideBySideTables;
+        }
+
+        public void setSplitMinGapWidth(float splitMinGapWidth) {
+            this.splitMinGapWidth = splitMinGapWidth;
+        }
+
+        public void setSplitMinValidRows(int splitMinValidRows) {
+            this.splitMinValidRows = splitMinValidRows;
+        }
+
+        public void setSplitMinBlocksPerRow(int splitMinBlocksPerRow) {
+            this.splitMinBlocksPerRow = splitMinBlocksPerRow;
+        }
+
+        private void applySplitSettings() {
+            basicExtractor.setSplitSideBySideTables(this.splitSideBySideTables);
+            basicExtractor.setSplitMinGapWidth(this.splitMinGapWidth);
+            basicExtractor.setSplitMinValidRows(this.splitMinValidRows);
+            basicExtractor.setSplitMinBlocksPerRow(this.splitMinBlocksPerRow);
+        }
+
         public void setMethod(ExtractionMethod method) {
             this.method = method;
         }
@@ -420,6 +494,7 @@ public class CommandLineApp {
         }
 
         public List<Table> extractTablesBasic(Page page) {
+            applySplitSettings();
             if (guess) {
                 // guess the page areas to extract using a detection algorithm
                 // currently we only have a detector that uses spreadsheets to find table areas
